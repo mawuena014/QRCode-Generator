@@ -16,9 +16,17 @@ A FastAPI service that generates QR codes from text strings or URLs.
    ```
 
 2. Create a virtual environment:
+   
+   **Windows:**
    ```bash
    python -m venv .venv
    ```
+
+   **macOS/Linux:**
+   ```bash
+   python3 -m venv .venv
+   ```
+
 
 3. Activate the virtual environment:
 
