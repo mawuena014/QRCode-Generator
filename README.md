@@ -63,3 +63,7 @@ The API will be available at http://127.0.0.1:8000.
 
 Once the server is running, you can access the interactive Swagger UI documentation at:
 http://127.0.0.1:8000/docs
+
+## Side Note
+If you found this project helpful, please consider giving it a ⭐ and forking it if you'd like to contribute or customize it for your own use!
+
