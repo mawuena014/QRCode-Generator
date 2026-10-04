@@ -67,23 +67,30 @@ The API will be available at http://127.0.0.1:8000.
 ### Endpoints
 
 - `GET /health`: Returns service status.
-- `POST /generate_qr`: Takes a JSON body and returns a PNG image stream.
+- `POST /generate_qr`: Generates and streams a PNG QR code via `multipart/form-data`.
   
-  **Request Body Example (Standard):**
-  ```json
-  {
-    "url": "https://example.com"
-  }
+  **Form Parameters:**
+  - `url` *(required, text)*: The URL or text string to encode.
+  - `logo` *(optional, file)*: An image file (PNG, JPEG, etc.) to overlay at the center.
+  - `logo_size_ratio` *(optional, float, default: `0.22`, range: `0.05`–`0.30`)*: Relative size of the center logo.
+  - `add_logo_background` *(optional, bool, default: `true`)*: Adds a white padded background behind the logo for contrast.
+  - `box_size` *(optional, int, default: `10`)*: Pixel size of each QR module.
+  - `border` *(optional, int, default: `4`)*: Quiet zone border width.
+
+  **cURL Example (Standard):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    --output qr.png
   ```
 
-  **Request Body Example (With Center Logo):**
-  ```json
-  {
-    "url": "https://example.com",
-    "logo_base64": "data:image/png;base64,iVBORw0KGgo...",
-    "logo_size_ratio": 0.22,
-    "add_logo_background": true
-  }
+  **cURL Example (With Logo Upload):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    -F "logo=@/path/to/logo.png" \
+    -F "logo_size_ratio=0.22" \
+    --output qr_with_logo.png
   ```
 
 ## Documentation
