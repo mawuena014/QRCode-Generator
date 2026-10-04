@@ -4,8 +4,11 @@ A FastAPI service that generates QR codes from text strings or URLs.
 
 ## Features
 - POST endpoint to receive data and return a PNG image.
+- Optional center logo overlay with automatic high error-correction (`ERROR_CORRECT_H`).
+- Configurable logo ratio and background padding for scan reliability.
 - GET health check endpoint.
 - Automatic documentation via FastAPI (/docs).
+- Deterministic automated test suite with pytest.
 
 ## Installation
 
@@ -42,8 +45,15 @@ A FastAPI service that generates QR codes from text strings or URLs.
 
 4. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
+
+## Running Tests
+
+Run the hermetic test suite:
+```bash
+pytest
+```
 
 ## Usage
 
@@ -57,7 +67,24 @@ The API will be available at http://127.0.0.1:8000.
 ### Endpoints
 
 - `GET /health`: Returns service status.
-- `POST /generate_qr`: Takes a JSON body like `{"url": "string"}` and returns a PNG file.
+- `POST /generate_qr`: Takes a JSON body and returns a PNG image stream.
+  
+  **Request Body Example (Standard):**
+  ```json
+  {
+    "url": "https://example.com"
+  }
+  ```
+
+  **Request Body Example (With Center Logo):**
+  ```json
+  {
+    "url": "https://example.com",
+    "logo_base64": "data:image/png;base64,iVBORw0KGgo...",
+    "logo_size_ratio": 0.22,
+    "add_logo_background": true
+  }
+  ```
 
 ## Documentation
 
