@@ -1,6 +1,5 @@
-"""Integration tests for FastAPI endpoints."""
+"""Integration tests for FastAPI endpoints with multipart/form-data upload."""
 
-import base64
 import io
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +8,17 @@ from PIL import Image
 from main import app
 
 
-def create_test_logo_b64() -> str:
-    """Helper generating a valid base64 PNG icon."""
-    img = Image.new("RGBA", (32, 32), color=(0, 0, 255, 255))
+def create_test_image_bytes(
+    mode: str = "RGBA",
+    size: tuple[int, int] = (32, 32),
+    color: tuple = (0, 0, 255, 255),
+    image_format: str = "PNG",
+) -> bytes:
+    """Helper generating synthetic image bytes."""
+    img = Image.new(mode, size, color=color)
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+    img.save(buf, format=image_format)
+    return buf.getvalue()
 
 
 @pytest.fixture
@@ -31,75 +35,83 @@ def test_health_check_endpoint(client: TestClient) -> None:
 
 
 def test_generate_qr_without_logo(client: TestClient) -> None:
-    """Ensure standard /generate_qr request succeeds and returns image/png."""
-    response = client.post("/generate_qr", json={"url": "https://antigravity.dev"})
+    """Ensure standard form request without file upload returns image/png."""
+    response = client.post("/generate_qr", data={"url": "https://antigravity.dev"})
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert len(response.content) > 0
 
 
-def test_generate_qr_with_valid_logo(client: TestClient) -> None:
-    """Ensure /generate_qr with base64 logo succeeds and returns image/png."""
-    logo_b64 = create_test_logo_b64()
+def test_generate_qr_with_png_file_upload(client: TestClient) -> None:
+    """Ensure /generate_qr with multipart PNG file upload succeeds."""
+    png_bytes = create_test_image_bytes(mode="RGBA", image_format="PNG")
     response = client.post(
         "/generate_qr",
-        json={
+        data={
             "url": "https://antigravity.dev",
-            "logo_base64": logo_b64,
-            "logo_size_ratio": 0.20,
-            "add_logo_background": True,
+            "logo_size_ratio": "0.20",
+            "add_logo_background": "true",
         },
+        files={"logo": ("logo.png", png_bytes, "image/png")},
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
 
-    # Verify response body can be parsed as a PNG
+    # Verify output stream is a valid PNG
     img = Image.open(io.BytesIO(response.content))
     assert img.format == "PNG"
 
 
-def test_generate_qr_with_data_uri_logo(client: TestClient) -> None:
-    """Ensure data URI format works cleanly via HTTP endpoint."""
-    logo_b64 = create_test_logo_b64()
-    data_uri = f"data:image/png;base64,{logo_b64}"
+def test_generate_qr_with_jpeg_file_upload(client: TestClient) -> None:
+    """Ensure /generate_qr with multipart JPEG file upload succeeds."""
+    jpeg_bytes = create_test_image_bytes(
+        mode="RGB",
+        color=(255, 255, 0),
+        image_format="JPEG",
+    )
     response = client.post(
         "/generate_qr",
-        json={"url": "https://antigravity.dev", "logo_base64": data_uri},
+        data={"url": "https://antigravity.dev"},
+        files={"logo": ("icon.jpg", jpeg_bytes, "image/jpeg")},
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
 
 
-def test_generate_qr_with_invalid_logo_base64(client: TestClient) -> None:
-    """Ensure malformed base64 logo returns 400 Bad Request."""
+def test_generate_qr_with_unselected_file_input(client: TestClient) -> None:
+    """Ensure browser submitting empty unselected file field does not fail."""
     response = client.post(
         "/generate_qr",
-        json={"url": "https://antigravity.dev", "logo_base64": "invalid_base64!#%"},
+        data={"url": "https://antigravity.dev"},
+        files={"logo": ("", b"", "application/octet-stream")},
     )
-    assert response.status_code == 400
-    assert "Malformed base64" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
 
 
-def test_generate_qr_with_non_image_payload(client: TestClient) -> None:
-    """Ensure valid base64 that is not an image returns 400 Bad Request."""
-    text_b64 = base64.b64encode(b"Not an image at all").decode("utf-8")
+def test_generate_qr_with_corrupt_file(client: TestClient) -> None:
+    """Ensure corrupted image file upload returns 400 Bad Request."""
     response = client.post(
         "/generate_qr",
-        json={"url": "https://antigravity.dev", "logo_base64": text_b64},
+        data={"url": "https://antigravity.dev"},
+        files={"logo": ("corrupt.png", b"this is not image data", "image/png")},
     )
     assert response.status_code == 400
     assert "Invalid or corrupted image format" in response.json()["detail"]
 
 
-def test_generate_qr_validation_bounds(client: TestClient) -> None:
-    """Ensure schema validation rejects invalid ratio bounds."""
-    # Logo size ratio > 0.30 should be rejected by Pydantic
+def test_generate_qr_form_validation_bounds(client: TestClient) -> None:
+    """Ensure form parameter bounds are defensively validated."""
+    # Logo size ratio > 0.30 should be rejected
     response = client.post(
         "/generate_qr",
-        json={"url": "https://antigravity.dev", "logo_size_ratio": 0.50},
+        data={"url": "https://antigravity.dev", "logo_size_ratio": "0.45"},
     )
     assert response.status_code == 422
 
     # Empty URL should be rejected
-    response = client.post("/generate_qr", json={"url": ""})
+    response = client.post(
+        "/generate_qr",
+        data={"url": ""},
+    )
     assert response.status_code == 422
