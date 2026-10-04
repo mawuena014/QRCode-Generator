@@ -1,15 +1,10 @@
 """QR Code generation and image processing domain service."""
 
-import base64
-import binascii
 import io
-import re
-from typing import Optional, Tuple
+from typing import Optional
 from PIL import Image, ImageDraw, UnidentifiedImageError
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H, ERROR_CORRECT_M
-
-from schema import QRCodeRequest
 
 
 class QRCodeGeneratorError(Exception):
@@ -17,26 +12,36 @@ class QRCodeGeneratorError(Exception):
 
 
 class InvalidLogoError(QRCodeGeneratorError):
-    """Raised when an provided logo image cannot be decoded or validated."""
+    """Raised when a provided logo image cannot be decoded or validated."""
 
 
 class QRCodeService:
     """Domain service responsible for rendering QR codes with optional center logos."""
 
     MAX_RAW_IMAGE_BYTES: int = 10 * 1024 * 1024  # 10 MB limit to prevent DoS
-    DATA_URI_PATTERN: re.Pattern = re.compile(r"^data:image\/[a-zA-Z0-9.+_-]+;base64,")
 
-    def generate(self, request: QRCodeRequest) -> io.BytesIO:
-        """Generate a QR code image as a PNG bytes buffer according to request parameters."""
-        error_correction = ERROR_CORRECT_H if request.logo_base64 is not None else ERROR_CORRECT_M
+    def generate(
+        self,
+        url: str,
+        logo_bytes: Optional[bytes] = None,
+        logo_size_ratio: float = 0.22,
+        add_logo_background: bool = True,
+        box_size: int = 10,
+        border: int = 4,
+    ) -> io.BytesIO:
+        """Generate a QR code image as a PNG bytes buffer with optional center logo."""
+        if not url or not url.strip():
+            raise QRCodeGeneratorError("URL/text content cannot be empty.")
+
+        error_correction = ERROR_CORRECT_H if logo_bytes is not None else ERROR_CORRECT_M
 
         qr = qrcode.QRCode(
-            version=None,  # Auto-size version according to data and error correction
+            version=None,
             error_correction=error_correction,
-            box_size=request.box_size,
-            border=request.border,
+            box_size=box_size,
+            border=border,
         )
-        qr.add_data(request.url)
+        qr.add_data(url)
         try:
             qr.make(fit=True)
         except Exception as exc:
@@ -46,13 +51,13 @@ class QRCodeService:
         base_qr_img = qr.make_image(fill_color="black", back_color="white")
         qr_canvas: Image.Image = base_qr_img.convert("RGBA")
 
-        if request.logo_base64 is not None:
-            logo_img = self._decode_and_validate_logo(request.logo_base64)
+        if logo_bytes is not None:
+            logo_img = self._validate_and_load_logo(logo_bytes)
             qr_canvas = self._overlay_center_logo(
                 qr_canvas=qr_canvas,
                 logo_img=logo_img,
-                size_ratio=request.logo_size_ratio,
-                add_background=request.add_logo_background,
+                size_ratio=logo_size_ratio,
+                add_background=add_logo_background,
             )
 
         output_buffer = io.BytesIO()
@@ -60,25 +65,14 @@ class QRCodeService:
         output_buffer.seek(0)
         return output_buffer
 
-    def _decode_and_validate_logo(self, raw_base64_str: str) -> Image.Image:
-        """Safely decode, sanitize, and validate an input base64 image string."""
-        cleaned_str = raw_base64_str.strip()
-        cleaned_str = self.DATA_URI_PATTERN.sub("", cleaned_str)
-
-        if not cleaned_str:
-            raise InvalidLogoError("Decoded logo payload is empty.")
-
-        try:
-            image_bytes = base64.b64decode(cleaned_str, validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise InvalidLogoError(f"Malformed base64 logo string: {exc}") from exc
-
+    def _validate_and_load_logo(self, image_bytes: bytes) -> Image.Image:
+        """Safely validate image integrity and load into an RGBA Pillow Image."""
         if len(image_bytes) == 0:
-            raise InvalidLogoError("Decoded logo payload is empty.")
+            raise InvalidLogoError("Uploaded logo file is empty.")
 
         if len(image_bytes) > self.MAX_RAW_IMAGE_BYTES:
             raise InvalidLogoError(
-                f"Logo payload exceeds maximum allowed size of {self.MAX_RAW_IMAGE_BYTES} bytes."
+                f"Logo file exceeds maximum allowed size of {self.MAX_RAW_IMAGE_BYTES} bytes."
             )
 
         # Integrity verification
