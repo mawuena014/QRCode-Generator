@@ -28,7 +28,7 @@ class QRCodeService:
 
     def generate(self, request: QRCodeRequest) -> io.BytesIO:
         """Generate a QR code image as a PNG bytes buffer according to request parameters."""
-        error_correction = ERROR_CORRECT_H if request.logo_base64 else ERROR_CORRECT_M
+        error_correction = ERROR_CORRECT_H if request.logo_base64 is not None else ERROR_CORRECT_M
 
         qr = qrcode.QRCode(
             version=None,  # Auto-size version according to data and error correction
@@ -46,7 +46,7 @@ class QRCodeService:
         base_qr_img = qr.make_image(fill_color="black", back_color="white")
         qr_canvas: Image.Image = base_qr_img.convert("RGBA")
 
-        if request.logo_base64:
+        if request.logo_base64 is not None:
             logo_img = self._decode_and_validate_logo(request.logo_base64)
             qr_canvas = self._overlay_center_logo(
                 qr_canvas=qr_canvas,
@@ -64,6 +64,9 @@ class QRCodeService:
         """Safely decode, sanitize, and validate an input base64 image string."""
         cleaned_str = raw_base64_str.strip()
         cleaned_str = self.DATA_URI_PATTERN.sub("", cleaned_str)
+
+        if not cleaned_str:
+            raise InvalidLogoError("Decoded logo payload is empty.")
 
         try:
             image_bytes = base64.b64decode(cleaned_str, validate=True)
