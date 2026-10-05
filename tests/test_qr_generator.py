@@ -4,7 +4,12 @@ import io
 import pytest
 from PIL import Image
 
-from services.qr_generator import InvalidLogoError, QRCodeGeneratorError, QRCodeService
+from services.qr_generator import (
+    InvalidColorError,
+    InvalidLogoError,
+    QRCodeGeneratorError,
+    QRCodeService,
+)
 
 
 def create_synthetic_image_bytes(
@@ -94,3 +99,59 @@ class TestQRCodeService:
         """Verify empty url string raises QRCodeGeneratorError."""
         with pytest.raises(QRCodeGeneratorError, match="URL/text content cannot be empty"):
             service.generate(url="")
+
+    def test_generate_qr_with_custom_hex_colors(self, service: QRCodeService) -> None:
+        """Verify QR generation succeeds with valid hex colors."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            fill_color="#1A56DB",
+            back_color="#F3F4F6",
+        )
+        assert output is not None
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+
+    def test_generate_qr_with_named_css_colors(self, service: QRCodeService) -> None:
+        """Verify QR generation succeeds with named CSS colors."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            fill_color="navy",
+            back_color="ghostwhite",
+        )
+        assert output is not None
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+
+    def test_invalid_fill_color_raises_invalid_color_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify unresolvable fill color raises InvalidColorError."""
+        with pytest.raises(InvalidColorError, match="Invalid fill_color"):
+            service.generate(url="https://antigravity.dev", fill_color="not_a_color")
+
+    def test_invalid_back_color_raises_invalid_color_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify unresolvable back color raises InvalidColorError."""
+        with pytest.raises(InvalidColorError, match="Invalid back_color"):
+            service.generate(url="https://antigravity.dev", back_color="xyz123")
+
+    def test_empty_color_string_raises_invalid_color_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify empty color string raises InvalidColorError."""
+        with pytest.raises(InvalidColorError, match="cannot be empty"):
+            service.generate(url="https://antigravity.dev", fill_color="   ")
+
+    def test_matching_colors_raises_invalid_color_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify identical fill and back colors raise contrast InvalidColorError."""
+        with pytest.raises(InvalidColorError, match="cannot be identical"):
+            service.generate(
+                url="https://antigravity.dev",
+                fill_color="#000000",
+                back_color="black",
+            )

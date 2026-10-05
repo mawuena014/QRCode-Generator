@@ -115,3 +115,66 @@ def test_generate_qr_form_validation_bounds(client: TestClient) -> None:
         data={"url": ""},
     )
     assert response.status_code == 422
+
+
+def test_generate_qr_with_custom_colors_success(client: TestClient) -> None:
+    """Ensure form request with valid custom hex and named colors returns 200 PNG."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "fill_color": "#0055FF",
+            "back_color": "ghostwhite",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    img = Image.open(io.BytesIO(response.content))
+    assert img.format == "PNG"
+
+
+def test_generate_qr_with_invalid_color_returns_400(client: TestClient) -> None:
+    """Ensure unresolvable color string returns 400 Bad Request."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "fill_color": "invalid_color_name",
+        },
+    )
+    assert response.status_code == 400
+    assert "Invalid fill_color" in response.json()["detail"]
+
+
+def test_generate_qr_with_matching_colors_returns_400(client: TestClient) -> None:
+    """Ensure identical fill and back colors return 400 Bad Request."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "fill_color": "black",
+            "back_color": "#000000",
+        },
+    )
+    assert response.status_code == 400
+    assert "cannot be identical" in response.json()["detail"]
+
+
+def test_generate_qr_with_custom_colors_and_logo(client: TestClient) -> None:
+    """Ensure combining custom colors and center logo image file upload succeeds."""
+    png_bytes = create_test_image_bytes(mode="RGBA", image_format="PNG")
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "fill_color": "#8B0000",
+            "back_color": "#FFF8DC",
+            "logo_size_ratio": "0.20",
+        },
+        files={"logo": ("logo.png", png_bytes, "image/png")},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    img = Image.open(io.BytesIO(response.content))
+    assert img.format == "PNG"
+

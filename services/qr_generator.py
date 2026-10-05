@@ -2,7 +2,7 @@
 
 import io
 from typing import Optional
-from PIL import Image, ImageDraw, UnidentifiedImageError
+from PIL import Image, ImageColor, ImageDraw, UnidentifiedImageError
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H, ERROR_CORRECT_M
 
@@ -13,6 +13,10 @@ class QRCodeGeneratorError(Exception):
 
 class InvalidLogoError(QRCodeGeneratorError):
     """Raised when a provided logo image cannot be decoded or validated."""
+
+
+class InvalidColorError(QRCodeGeneratorError):
+    """Raised when an invalid or unresolvable color string is specified."""
 
 
 class QRCodeService:
@@ -28,10 +32,14 @@ class QRCodeService:
         add_logo_background: bool = True,
         box_size: int = 10,
         border: int = 4,
+        fill_color: str = "black",
+        back_color: str = "white",
     ) -> io.BytesIO:
         """Generate a QR code image as a PNG bytes buffer with optional center logo."""
         if not url or not url.strip():
             raise QRCodeGeneratorError("URL/text content cannot be empty.")
+
+        fill_rgb, back_rgb = self._validate_colors(fill_color, back_color)
 
         error_correction = ERROR_CORRECT_H if logo_bytes is not None else ERROR_CORRECT_M
 
@@ -47,8 +55,8 @@ class QRCodeService:
         except Exception as exc:
             raise QRCodeGeneratorError(f"Failed to compile QR matrix: {exc}") from exc
 
-        # Render base QR image and convert to RGBA for compositing
-        base_qr_img = qr.make_image(fill_color="black", back_color="white")
+        # Render base QR image with custom colors and convert to RGBA for compositing
+        base_qr_img = qr.make_image(fill_color=fill_rgb, back_color=back_rgb)
         qr_canvas: Image.Image = base_qr_img.convert("RGBA")
 
         if logo_bytes is not None:
@@ -134,3 +142,35 @@ class QRCodeService:
         # Alpha composite overlay
         qr_canvas.alpha_composite(resized_logo, dest=(pos_x, pos_y))
         return qr_canvas
+
+    def _validate_colors(
+        self, fill_color: str, back_color: str
+    ) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+        """Validate and resolve foreground and background color strings."""
+        if not fill_color or not fill_color.strip():
+            raise InvalidColorError("Foreground fill_color cannot be empty.")
+        if not back_color or not back_color.strip():
+            raise InvalidColorError("Background back_color cannot be empty.")
+
+        try:
+            fill_rgb = ImageColor.getrgb(fill_color.strip())
+        except Exception as exc:
+            raise InvalidColorError(
+                f"Invalid fill_color '{fill_color}': must be a valid hex string or CSS color name."
+            ) from exc
+
+        try:
+            back_rgb = ImageColor.getrgb(back_color.strip())
+        except Exception as exc:
+            raise InvalidColorError(
+                f"Invalid back_color '{back_color}': must be a valid hex string or CSS color name."
+            ) from exc
+
+        # Compare RGB values (strip alpha if returned)
+        if fill_rgb[:3] == back_rgb[:3]:
+            raise InvalidColorError(
+                f"fill_color and back_color cannot be identical ({fill_color}). "
+                "Sufficient contrast is required for scanning."
+            )
+
+        return fill_rgb[:3], back_rgb[:3]
