@@ -2,7 +2,12 @@ from typing import Optional
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from services.qr_generator import InvalidLogoError, QRCodeGeneratorError, QRCodeService
+from services.qr_generator import (
+    InvalidColorError,
+    InvalidLogoError,
+    QRCodeGeneratorError,
+    QRCodeService,
+)
 
 app = FastAPI(title="QR Code Generator")
 
@@ -51,9 +56,17 @@ async def generate_qr(
         le=20,
         description="Width of the quiet zone border around the QR code",
     ),
+    fill_color: str = Form(
+        default="black",
+        description="Foreground color for QR modules (hex code e.g. #1A56DB or CSS color name)",
+    ),
+    back_color: str = Form(
+        default="white",
+        description="Background canvas color (hex code e.g. #FFFFFF or CSS color name)",
+    ),
     service: QRCodeService = Depends(get_qr_service),
 ) -> StreamingResponse:
-    """Generate a QR code from form data with optional center logo image file upload."""
+    """Generate a QR code from form data with optional center logo and custom colors."""
     try:
         logo_bytes: Optional[bytes] = None
         if logo is not None:
@@ -71,9 +84,11 @@ async def generate_qr(
             add_logo_background=add_logo_background,
             box_size=box_size,
             border=border,
+            fill_color=fill_color,
+            back_color=back_color,
         )
         return StreamingResponse(buffer, media_type="image/png")
-    except InvalidLogoError as exc:
+    except (InvalidLogoError, InvalidColorError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except QRCodeGeneratorError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
