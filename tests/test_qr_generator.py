@@ -6,6 +6,8 @@ from PIL import Image
 
 from services.qr_generator import (
     InvalidColorError,
+    InvalidDrawerError,
+    InvalidGradientError,
     InvalidLogoError,
     QRCodeGeneratorError,
     QRCodeService,
@@ -155,3 +157,123 @@ class TestQRCodeService:
                 fill_color="#000000",
                 back_color="black",
             )
+
+    @pytest.mark.parametrize(
+        "drawer_name",
+        ["circle", "rounded", "gapped_square", "vertical_bars", "horizontal_bars"],
+    )
+    def test_generate_with_styled_module_drawers(
+        self, service: QRCodeService, drawer_name: str
+    ) -> None:
+        """Verify each supported module drawer generates a valid PNG."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            drawer=drawer_name,
+        )
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+        assert img.width > 0
+
+    @pytest.mark.parametrize("eye_drawer_name", ["circle", "rounded", "gapped_square"])
+    def test_generate_with_styled_eye_drawers(
+        self, service: QRCodeService, eye_drawer_name: str
+    ) -> None:
+        """Verify custom eye drawers composite properly."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            drawer="circle",
+            eye_drawer=eye_drawer_name,
+        )
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+
+    def test_invalid_drawer_raises_invalid_drawer_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify unknown module drawer raises InvalidDrawerError."""
+        with pytest.raises(InvalidDrawerError, match="Unsupported module drawer"):
+            service.generate(url="https://antigravity.dev", drawer="hexagon")
+
+    def test_invalid_eye_drawer_raises_invalid_drawer_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify unknown eye drawer raises InvalidDrawerError."""
+        with pytest.raises(InvalidDrawerError, match="Unsupported eye drawer"):
+            service.generate(url="https://antigravity.dev", eye_drawer="diamond")
+
+    @pytest.mark.parametrize("gradient_type", ["radial", "horizontal", "vertical"])
+    def test_generate_with_gradients(
+        self, service: QRCodeService, gradient_type: str
+    ) -> None:
+        """Verify linear and radial gradients generate valid images."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            gradient_type=gradient_type,
+            gradient_start_color="#7B1FA2",
+            gradient_end_color="#00BCD4",
+        )
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+
+    def test_gradient_missing_end_color_raises_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify gradient without end color raises InvalidGradientError."""
+        with pytest.raises(InvalidGradientError, match="gradient_end_color must be specified"):
+            service.generate(
+                url="https://antigravity.dev",
+                gradient_type="radial",
+                gradient_start_color="#FF0000",
+            )
+
+    def test_invalid_gradient_type_raises_error(
+        self, service: QRCodeService
+    ) -> None:
+        """Verify unknown gradient type raises InvalidGradientError."""
+        with pytest.raises(InvalidGradientError, match="Unsupported gradient_type"):
+            service.generate(
+                url="https://antigravity.dev",
+                gradient_type="diagonal",
+                gradient_start_color="#FF0000",
+                gradient_end_color="#0000FF",
+            )
+
+    def test_generate_transparent_background(self, service: QRCodeService) -> None:
+        """Verify transparent background produces an RGBA PNG with 0-alpha corner."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            drawer="circle",
+            fill_color="#1A56DB",
+            transparent_background=True,
+        )
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+        assert img.mode == "RGBA"
+        # Corner quiet zone pixel must have alpha 0
+        corner_pixel = img.getpixel((0, 0))
+        assert corner_pixel[3] == 0
+
+    def test_generate_combined_styles_with_logo(self, service: QRCodeService) -> None:
+        """Verify combination of rounded drawer, radial gradient, transparency, and logo."""
+        logo_bytes = create_synthetic_image_bytes(mode="RGBA", size=(50, 50))
+        output = service.generate(
+            url="https://antigravity.dev",
+            drawer="rounded",
+            eye_drawer="circle",
+            gradient_type="radial",
+            gradient_start_color="#9C27B0",
+            gradient_end_color="#E91E63",
+            transparent_background=True,
+            logo_bytes=logo_bytes,
+            add_logo_background=True,
+        )
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+        assert img.mode == "RGBA"
+        # Corner remains transparent
+        assert img.getpixel((0, 0))[3] == 0
