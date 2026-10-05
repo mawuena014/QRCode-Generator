@@ -4,8 +4,11 @@ A FastAPI service that generates QR codes from text strings or URLs.
 
 ## Features
 - POST endpoint to receive data and return a PNG image.
+- Optional center logo overlay with automatic high error-correction (`ERROR_CORRECT_H`).
+- Configurable logo ratio and background padding for scan reliability.
 - GET health check endpoint.
 - Automatic documentation via FastAPI (/docs).
+- Deterministic automated test suite with pytest.
 
 ## Installation
 
@@ -42,8 +45,15 @@ A FastAPI service that generates QR codes from text strings or URLs.
 
 4. Install dependencies:
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
+
+## Running Tests
+
+Run the hermetic test suite:
+```bash
+pytest
+```
 
 ## Usage
 
@@ -57,7 +67,31 @@ The API will be available at http://127.0.0.1:8000.
 ### Endpoints
 
 - `GET /health`: Returns service status.
-- `POST /generate_qr`: Takes a JSON body like `{"url": "string"}` and returns a PNG file.
+- `POST /generate_qr`: Generates and streams a PNG QR code via `multipart/form-data`.
+  
+  **Form Parameters:**
+  - `url` *(required, text)*: The URL or text string to encode.
+  - `logo` *(optional, file)*: An image file (PNG, JPEG, etc.) to overlay at the center.
+  - `logo_size_ratio` *(optional, float, default: `0.22`, range: `0.05`–`0.30`)*: Relative size of the center logo.
+  - `add_logo_background` *(optional, bool, default: `true`)*: Adds a white padded background behind the logo for contrast.
+  - `box_size` *(optional, int, default: `10`)*: Pixel size of each QR module.
+  - `border` *(optional, int, default: `4`)*: Quiet zone border width.
+
+  **cURL Example (Standard):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    --output qr.png
+  ```
+
+  **cURL Example (With Logo Upload):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    -F "logo=@/path/to/logo.png" \
+    -F "logo_size_ratio=0.22" \
+    --output qr_with_logo.png
+  ```
 
 ## Documentation
 
