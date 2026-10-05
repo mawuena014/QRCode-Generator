@@ -178,3 +178,112 @@ def test_generate_qr_with_custom_colors_and_logo(client: TestClient) -> None:
     img = Image.open(io.BytesIO(response.content))
     assert img.format == "PNG"
 
+
+def test_generate_qr_with_styled_module_drawer(client: TestClient) -> None:
+    """Ensure form request with styled drawer generates valid PNG."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "drawer": "circle",
+            "eye_drawer": "rounded",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+
+
+def test_generate_qr_with_gradient_and_transparency(client: TestClient) -> None:
+    """Ensure form request with radial gradient and transparent background generates RGBA PNG."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "drawer": "rounded",
+            "gradient_type": "radial",
+            "gradient_start_color": "#FF007F",
+            "gradient_end_color": "#7F00FF",
+            "transparent_background": "true",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    img = Image.open(io.BytesIO(response.content))
+    assert img.format == "PNG"
+    assert img.mode == "RGBA"
+    # Corner pixel should have alpha 0
+    assert img.getpixel((0, 0))[3] == 0
+
+
+def test_generate_qr_with_invalid_drawer_returns_422(client: TestClient) -> None:
+    """Ensure invalid drawer name returns 422 Unprocessable Entity via enum validation."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "drawer": "unknown_shape",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_generate_qr_with_invalid_gradient_type_returns_422(client: TestClient) -> None:
+    """Ensure unknown gradient type returns 422 Unprocessable Entity via enum validation."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "gradient_type": "diagonal",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_generate_qr_with_missing_gradient_end_color_returns_400(client: TestClient) -> None:
+    """Ensure missing gradient end color returns 400 Bad Request."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "gradient_type": "horizontal",
+        },
+    )
+    assert response.status_code == 400
+    assert "gradient_end_color must be specified" in response.json()["detail"]
+
+
+def test_openapi_schema_defines_enums_for_dropdowns(client: TestClient) -> None:
+    """Ensure OpenAPI schema exposes DrawerType, EyeDrawerType, and GradientType enum schemas."""
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schemas = response.json()["components"]["schemas"]
+    assert "DrawerType" in schemas
+    assert "EyeDrawerType" in schemas
+    assert "GradientType" in schemas
+    assert "circle" in schemas["DrawerType"]["enum"]
+    assert "radial" in schemas["GradientType"]["enum"]
+
+
+def test_generate_qr_with_all_styling_and_logo(client: TestClient) -> None:
+    """Ensure comprehensive combination of styled drawer, eye, gradient, transparency, and logo."""
+    png_bytes = create_test_image_bytes(mode="RGBA", image_format="PNG")
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "drawer": "circle",
+            "eye_drawer": "circle",
+            "gradient_type": "vertical",
+            "gradient_start_color": "#00C9FF",
+            "gradient_end_color": "#92FE9D",
+            "transparent_background": "true",
+            "add_logo_background": "true",
+        },
+        files={"logo": ("logo.png", png_bytes, "image/png")},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    img = Image.open(io.BytesIO(response.content))
+    assert img.format == "PNG"
+    assert img.mode == "RGBA"
+

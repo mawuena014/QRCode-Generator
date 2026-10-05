@@ -1,10 +1,14 @@
 # QR Code Generator
 
-A FastAPI service that generates QR codes from text strings or URLs.
+A FastAPI service that generates styled QR codes from text strings or URLs.
 
 ## Features
 - POST endpoint to receive data and return a PNG image.
-- Customizable module foreground (`fill_color`) and canvas background (`back_color`) colors with contrast verification.
+- Customizable module shapes: `square`, `circle` (dots), `rounded`, `gapped_square`, `vertical_bars`, and `horizontal_bars`.
+- Independent corner finder "eye" styling: `square`, `circle`, `rounded`, `gapped_square`.
+- Multi-color gradients across modules: `radial`, `horizontal`, and `vertical`.
+- 100% transparent PNG background support for seamless web, poster, and graphic overlays.
+- Customizable foreground (`fill_color`) and canvas background (`back_color`) colors with contrast verification.
 - Optional center logo overlay with automatic high error-correction (`ERROR_CORRECT_H`).
 - Configurable logo ratio and background padding for scan reliability.
 - GET health check endpoint.
@@ -72,6 +76,18 @@ The API will be available at http://127.0.0.1:8000.
   
   **Form Parameters:**
   - `url` *(required, text)*: The URL or text content to encode.
+  - `drawer` *(optional, text, default: `"square"`)*: Module shape style. Options:
+    - `square`: Standard square modules.
+    - `circle`: Circular dot modules.
+    - `rounded`: Smoothly rounded squares.
+    - `gapped_square`: Separated square modules.
+    - `vertical_bars`: Continuous vertical bars.
+    - `horizontal_bars`: Continuous horizontal bars.
+  - `eye_drawer` *(optional, text, default: follows `drawer` or standard)*: Corner marker shape. Options: `square`, `circle`, `rounded`, `gapped_square`.
+  - `gradient_type` *(optional, text, default: `"none"`)*: Gradient mode. Options: `none`, `radial`, `horizontal`, `vertical`.
+  - `gradient_start_color` *(optional, text, default: `fill_color`)*: Start color for gradient (Hex or CSS name).
+  - `gradient_end_color` *(optional, text)*: End color for gradient (required when `gradient_type` is not `"none"`).
+  - `transparent_background` *(optional, bool, default: `false`)*: Outputs an RGBA PNG with 100% transparent background.
   - `fill_color` *(optional, text, default: `"black"`)*: Foreground color for QR modules. Supports hex codes (e.g. `#1A56DB`, `#000`) and standard CSS color names (`navy`, `darkblue`, etc.).
   - `back_color` *(optional, text, default: `"white"`)*: Canvas background color. Supports hex codes and CSS color names. Must contrast with `fill_color`.
   - `logo` *(optional, file)*: An image file (PNG, JPEG, etc., max 10 MB) to overlay at the center.
@@ -87,19 +103,33 @@ The API will be available at http://127.0.0.1:8000.
     --output qr.png
   ```
 
-  **cURL Example (Custom Colors):**
+  **cURL Example (Circular Dots & Rounded Eyes):**
   ```bash
   curl -X POST "http://127.0.0.1:8000/generate_qr" \
     -F "url=https://example.com" \
+    -F "drawer=circle" \
+    -F "eye_drawer=rounded" \
     -F "fill_color=#0055FF" \
-    -F "back_color=#F3F4F6" \
-    --output qr_colored.png
+    --output qr_dots.png
+  ```
+
+  **cURL Example (Radial Gradient & Transparent Background):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    -F "drawer=rounded" \
+    -F "gradient_type=radial" \
+    -F "gradient_start_color=#FF007F" \
+    -F "gradient_end_color=#7F00FF" \
+    -F "transparent_background=true" \
+    --output qr_gradient.png
   ```
 
   **cURL Example (Custom Colors & Center Logo):**
   ```bash
   curl -X POST "http://127.0.0.1:8000/generate_qr" \
     -F "url=https://example.com" \
+    -F "drawer=circle" \
     -F "fill_color=navy" \
     -F "back_color=white" \
     -F "logo=@/path/to/logo.png" \
