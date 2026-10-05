@@ -4,6 +4,7 @@ A FastAPI service that generates QR codes from text strings or URLs.
 
 ## Features
 - POST endpoint to receive data and return a PNG image.
+- Customizable module foreground (`fill_color`) and canvas background (`back_color`) colors with contrast verification.
 - Optional center logo overlay with automatic high error-correction (`ERROR_CORRECT_H`).
 - Configurable logo ratio and background padding for scan reliability.
 - GET health check endpoint.
@@ -70,12 +71,14 @@ The API will be available at http://127.0.0.1:8000.
 - `POST /generate_qr`: Generates and streams a PNG QR code via `multipart/form-data`.
   
   **Form Parameters:**
-  - `url` *(required, text)*: The URL or text string to encode.
-  - `logo` *(optional, file)*: An image file (PNG, JPEG, etc.) to overlay at the center.
+  - `url` *(required, text)*: The URL or text content to encode.
+  - `fill_color` *(optional, text, default: `"black"`)*: Foreground color for QR modules. Supports hex codes (e.g. `#1A56DB`, `#000`) and standard CSS color names (`navy`, `darkblue`, etc.).
+  - `back_color` *(optional, text, default: `"white"`)*: Canvas background color. Supports hex codes and CSS color names. Must contrast with `fill_color`.
+  - `logo` *(optional, file)*: An image file (PNG, JPEG, etc., max 10 MB) to overlay at the center.
   - `logo_size_ratio` *(optional, float, default: `0.22`, range: `0.05`–`0.30`)*: Relative size of the center logo.
   - `add_logo_background` *(optional, bool, default: `true`)*: Adds a white padded background behind the logo for contrast.
-  - `box_size` *(optional, int, default: `10`)*: Pixel size of each QR module.
-  - `border` *(optional, int, default: `4`)*: Quiet zone border width.
+  - `box_size` *(optional, int, default: `10`, range: `1`–`50`)*: Pixel size of each QR module.
+  - `border` *(optional, int, default: `4`, range: `1`–`20`)*: Quiet zone border width.
 
   **cURL Example (Standard):**
   ```bash
@@ -84,13 +87,24 @@ The API will be available at http://127.0.0.1:8000.
     --output qr.png
   ```
 
-  **cURL Example (With Logo Upload):**
+  **cURL Example (Custom Colors):**
   ```bash
   curl -X POST "http://127.0.0.1:8000/generate_qr" \
     -F "url=https://example.com" \
+    -F "fill_color=#0055FF" \
+    -F "back_color=#F3F4F6" \
+    --output qr_colored.png
+  ```
+
+  **cURL Example (Custom Colors & Center Logo):**
+  ```bash
+  curl -X POST "http://127.0.0.1:8000/generate_qr" \
+    -F "url=https://example.com" \
+    -F "fill_color=navy" \
+    -F "back_color=white" \
     -F "logo=@/path/to/logo.png" \
     -F "logo_size_ratio=0.22" \
-    --output qr_with_logo.png
+    --output qr_branded.png
   ```
 
 ## Documentation
@@ -100,4 +114,3 @@ http://127.0.0.1:8000/docs
 
 ## Side Note
 If you found this project helpful, please consider giving it a ⭐ and forking it if you'd like to contribute or customize it for your own use!
-
