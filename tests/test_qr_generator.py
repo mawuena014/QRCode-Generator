@@ -5,6 +5,9 @@ import pytest
 from PIL import Image
 
 from services.qr_generator import (
+    DrawerType,
+    EyeDrawerType,
+    GradientType,
     InvalidColorError,
     InvalidDrawerError,
     InvalidGradientError,
@@ -277,3 +280,19 @@ class TestQRCodeService:
         assert img.mode == "RGBA"
         # Corner remains transparent
         assert img.getpixel((0, 0))[3] == 0
+
+    def test_generate_with_enum_instances(self, service: QRCodeService) -> None:
+        """Verify passing DrawerType, EyeDrawerType, and GradientType Enum instances works."""
+        output = service.generate(
+            url="https://antigravity.dev",
+            drawer=DrawerType.CIRCLE,
+            eye_drawer=EyeDrawerType.ROUNDED,
+            gradient_type=GradientType.RADIAL,
+            gradient_start_color="#123456",
+            gradient_end_color="#abcdef",
+        )
+        assert output is not None
+        output.seek(0)
+        img = Image.open(output)
+        assert img.format == "PNG"
+

@@ -1,6 +1,9 @@
 """QR code domain services and exceptions."""
 
 from .qr_generator import (
+    DrawerType,
+    EyeDrawerType,
+    GradientType,
     InvalidColorError,
     InvalidDrawerError,
     InvalidGradientError,
@@ -16,4 +19,7 @@ __all__ = [
     "InvalidColorError",
     "InvalidDrawerError",
     "InvalidGradientError",
+    "DrawerType",
+    "EyeDrawerType",
+    "GradientType",
 ]
