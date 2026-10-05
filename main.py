@@ -4,6 +4,8 @@ from fastapi.responses import StreamingResponse
 
 from services.qr_generator import (
     InvalidColorError,
+    InvalidDrawerError,
+    InvalidGradientError,
     InvalidLogoError,
     QRCodeGeneratorError,
     QRCodeService,
@@ -64,9 +66,33 @@ async def generate_qr(
         default="white",
         description="Background canvas color (hex code e.g. #FFFFFF or CSS color name)",
     ),
+    drawer: str = Form(
+        default="square",
+        description="Module shape drawer: square, circle, rounded, gapped_square, vertical_bars, horizontal_bars",
+    ),
+    eye_drawer: Optional[str] = Form(
+        default=None,
+        description="Corner eye marker shape: square, circle, rounded, gapped_square",
+    ),
+    gradient_type: str = Form(
+        default="none",
+        description="Gradient mode across modules: none, radial, horizontal, vertical",
+    ),
+    gradient_start_color: Optional[str] = Form(
+        default=None,
+        description="Gradient start color (defaults to fill_color if unspecified)",
+    ),
+    gradient_end_color: Optional[str] = Form(
+        default=None,
+        description="Gradient end color (required when gradient_type is not 'none')",
+    ),
+    transparent_background: bool = Form(
+        default=False,
+        description="Whether to generate an RGBA PNG with 100% transparent background",
+    ),
     service: QRCodeService = Depends(get_qr_service),
 ) -> StreamingResponse:
-    """Generate a QR code from form data with optional center logo and custom colors."""
+    """Generate a QR code from form data with styled modules, eyes, gradients, and logos."""
     try:
         logo_bytes: Optional[bytes] = None
         if logo is not None:
@@ -86,9 +112,20 @@ async def generate_qr(
             border=border,
             fill_color=fill_color,
             back_color=back_color,
+            drawer=drawer,
+            eye_drawer=eye_drawer,
+            gradient_type=gradient_type,
+            gradient_start_color=gradient_start_color,
+            gradient_end_color=gradient_end_color,
+            transparent_background=transparent_background,
         )
         return StreamingResponse(buffer, media_type="image/png")
-    except (InvalidLogoError, InvalidColorError) as exc:
+    except (
+        InvalidLogoError,
+        InvalidColorError,
+        InvalidDrawerError,
+        InvalidGradientError,
+    ) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except QRCodeGeneratorError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
