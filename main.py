@@ -3,6 +3,9 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from services.qr_generator import (
+    DrawerType,
+    EyeDrawerType,
+    GradientType,
     InvalidColorError,
     InvalidDrawerError,
     InvalidGradientError,
@@ -66,16 +69,16 @@ async def generate_qr(
         default="white",
         description="Background canvas color (hex code e.g. #FFFFFF or CSS color name)",
     ),
-    drawer: str = Form(
-        default="square",
+    drawer: DrawerType = Form(
+        default=DrawerType.SQUARE,
         description="Module shape drawer: square, circle, rounded, gapped_square, vertical_bars, horizontal_bars",
     ),
-    eye_drawer: Optional[str] = Form(
+    eye_drawer: Optional[EyeDrawerType] = Form(
         default=None,
         description="Corner eye marker shape: square, circle, rounded, gapped_square",
     ),
-    gradient_type: str = Form(
-        default="none",
+    gradient_type: GradientType = Form(
+        default=GradientType.NONE,
         description="Gradient mode across modules: none, radial, horizontal, vertical",
     ),
     gradient_start_color: Optional[str] = Form(

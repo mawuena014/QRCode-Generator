@@ -215,8 +215,8 @@ def test_generate_qr_with_gradient_and_transparency(client: TestClient) -> None:
     assert img.getpixel((0, 0))[3] == 0
 
 
-def test_generate_qr_with_invalid_drawer_returns_400(client: TestClient) -> None:
-    """Ensure invalid drawer name returns 400 Bad Request."""
+def test_generate_qr_with_invalid_drawer_returns_422(client: TestClient) -> None:
+    """Ensure invalid drawer name returns 422 Unprocessable Entity via enum validation."""
     response = client.post(
         "/generate_qr",
         data={
@@ -224,11 +224,22 @@ def test_generate_qr_with_invalid_drawer_returns_400(client: TestClient) -> None
             "drawer": "unknown_shape",
         },
     )
-    assert response.status_code == 400
-    assert "Unsupported module drawer" in response.json()["detail"]
+    assert response.status_code == 422
 
 
-def test_generate_qr_with_invalid_gradient_returns_400(client: TestClient) -> None:
+def test_generate_qr_with_invalid_gradient_type_returns_422(client: TestClient) -> None:
+    """Ensure unknown gradient type returns 422 Unprocessable Entity via enum validation."""
+    response = client.post(
+        "/generate_qr",
+        data={
+            "url": "https://antigravity.dev",
+            "gradient_type": "diagonal",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_generate_qr_with_missing_gradient_end_color_returns_400(client: TestClient) -> None:
     """Ensure missing gradient end color returns 400 Bad Request."""
     response = client.post(
         "/generate_qr",
@@ -239,6 +250,18 @@ def test_generate_qr_with_invalid_gradient_returns_400(client: TestClient) -> No
     )
     assert response.status_code == 400
     assert "gradient_end_color must be specified" in response.json()["detail"]
+
+
+def test_openapi_schema_defines_enums_for_dropdowns(client: TestClient) -> None:
+    """Ensure OpenAPI schema exposes DrawerType, EyeDrawerType, and GradientType enum schemas."""
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schemas = response.json()["components"]["schemas"]
+    assert "DrawerType" in schemas
+    assert "EyeDrawerType" in schemas
+    assert "GradientType" in schemas
+    assert "circle" in schemas["DrawerType"]["enum"]
+    assert "radial" in schemas["GradientType"]["enum"]
 
 
 def test_generate_qr_with_all_styling_and_logo(client: TestClient) -> None:
